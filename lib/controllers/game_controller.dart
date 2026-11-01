@@ -52,19 +52,16 @@ class GameController extends ChangeNotifier {
   void start() {
     _gameLoop?.cancel();
     _spawner?.cancel();
-
-    _gameLoop = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      // Loop tick handled in page with current viewport dimensions
-    });
   }
 
-  void spawnObject(double screenWidth) {
+  void spawnObject(double playfieldWidth) {
     if (isPaused || countdown > 0 || isGameOver) return;
-    objects.add(FallingObject.random(screenWidth, baseSpeed));
+    objects.add(FallingObject.random(playfieldWidth, baseSpeed));
     notifyListeners();
   }
 
-  void updateWorld(double screenWidth, double screenHeight) {
+  void updateWorld(double playfieldWidth, double playfieldHeight,
+      {double bottomOffset = 20.0}) {
     if (isPaused || countdown > 0 || isGameOver) return;
 
     for (var obj in objects) {
@@ -72,7 +69,7 @@ class GameController extends ChangeNotifier {
     }
 
     objects.removeWhere((obj) {
-      if (obj.y > screenHeight) {
+      if (obj.y > playfieldHeight) {
         score++;
         GameSounds.score();
         baseSpeed += GameConfig.difficultyIncreaseRate;
@@ -81,15 +78,16 @@ class GameController extends ChangeNotifier {
       return false;
     });
 
-    _checkCollision(screenWidth, screenHeight);
+    _checkCollision(playfieldWidth, playfieldHeight,
+        bottomOffset: bottomOffset);
     notifyListeners();
   }
 
-  void movePlayer(bool left, double screenWidth) {
+  void movePlayer(bool left, double playfieldWidth) {
     if (isPaused || countdown > 0 || isGameOver) return;
 
     final maxRight =
-        (screenWidth - Constants.playerSize).clamp(0.0, double.infinity);
+        (playfieldWidth - Constants.playerSize).clamp(0.0, double.infinity);
 
     if (left) {
       player.x =
@@ -102,8 +100,25 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _checkCollision(double screenWidth, double screenHeight) {
-    final playerTop = screenHeight - Constants.playerSize - 20;
+  void movePlayerByDelta(double deltaX, double playfieldWidth) {
+    if (isPaused || countdown > 0 || isGameOver) return;
+    final maxRight =
+        (playfieldWidth - Constants.playerSize).clamp(0.0, double.infinity);
+    player.x = (player.x + deltaX).clamp(0.0, maxRight);
+    notifyListeners();
+  }
+
+  void setPlayerTargetX(double targetX, double playfieldWidth) {
+    if (isPaused || countdown > 0 || isGameOver) return;
+    final maxRight =
+        (playfieldWidth - Constants.playerSize).clamp(0.0, double.infinity);
+    player.x = (targetX - (Constants.playerSize / 2)).clamp(0.0, maxRight);
+    notifyListeners();
+  }
+
+  void _checkCollision(double playfieldWidth, double playfieldHeight,
+      {double bottomOffset = 20.0}) {
+    final playerTop = playfieldHeight - bottomOffset - Constants.playerSize;
 
     for (var obj in objects) {
       if (isColliding(
@@ -264,7 +279,7 @@ class GameController extends ChangeNotifier {
     });
   }
 
-  void restart(double screenWidth) {
+  void restart(double playfieldWidth) {
     _gameLoop?.cancel();
     _spawner?.cancel();
     _shieldTimer?.cancel();
@@ -281,7 +296,7 @@ class GameController extends ChangeNotifier {
     countdown = 0;
     _hitCounter = 0;
     isGameOver = false;
-    player.x = (screenWidth / 2) - (Constants.playerSize / 2);
+    player.x = (playfieldWidth / 2) - (Constants.playerSize / 2);
 
     notifyListeners();
   }

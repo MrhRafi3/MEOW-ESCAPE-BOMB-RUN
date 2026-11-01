@@ -3,12 +3,18 @@ import '../core/constants.dart';
 
 class PlayerWidget extends StatelessWidget {
   final double x;
-  const PlayerWidget({required this.x, super.key});
+  final double bottom;
+
+  const PlayerWidget({
+    required this.x,
+    this.bottom = 20,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 20,
+      bottom: bottom,
       left: x,
       child: Image.asset(
         'assets/images/player.png',

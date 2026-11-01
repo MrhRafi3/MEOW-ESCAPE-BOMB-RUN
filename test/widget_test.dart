@@ -119,4 +119,67 @@ void main() {
 
     controller.dispose();
   });
+
+  test('GameController handles continuous drag movement and clamping', () {
+    final controller = GameController(initialPlayerX: 100);
+    const double playfieldWidth = 400.0;
+    const double maxRight = playfieldWidth - Constants.playerSize;
+
+    // Positive delta moves right
+    controller.movePlayerByDelta(25.0, playfieldWidth);
+    expect(controller.player.x, equals(125.0));
+
+    // Negative delta moves left
+    controller.movePlayerByDelta(-50.0, playfieldWidth);
+    expect(controller.player.x, equals(75.0));
+
+    // Dragging past right boundary clamps at maxRight
+    controller.movePlayerByDelta(500.0, playfieldWidth);
+    expect(controller.player.x, equals(maxRight));
+
+    // Dragging past left boundary clamps at 0.0
+    controller.movePlayerByDelta(-500.0, playfieldWidth);
+    expect(controller.player.x, equals(0.0));
+
+    controller.dispose();
+  });
+
+  test('GameController centers player on target X and clamps properly', () {
+    final controller = GameController(initialPlayerX: 100);
+    const double playfieldWidth = 400.0;
+    const double maxRight = playfieldWidth - Constants.playerSize;
+
+    // Target at 200 centers player (200 - 30 = 170)
+    controller.setPlayerTargetX(200.0, playfieldWidth);
+    expect(controller.player.x, equals(200.0 - (Constants.playerSize / 2)));
+
+    // Target far left clamps to 0.0
+    controller.setPlayerTargetX(10.0, playfieldWidth);
+    expect(controller.player.x, equals(0.0));
+
+    // Target far right clamps to maxRight
+    controller.setPlayerTargetX(500.0, playfieldWidth);
+    expect(controller.player.x, equals(maxRight));
+
+    controller.dispose();
+  });
+
+  test('GameController collision check respects safe-area bottom offset', () {
+    final controller = GameController(initialPlayerX: 100);
+    const double screenHeight = 800.0;
+    const double bottomOffset = 50.0;
+    // player top is: 800 - 50 - 60 = 690. Player rect: y in [690, 750], x in [100, 160]
+
+    // Object falling at y = 695, x = 110 overlaps player
+    final hazard = FallingObject(x: 110, y: 695, speed: 0);
+    controller.objects.add(hazard);
+
+    controller.updateWorld(400, screenHeight, bottomOffset: bottomOffset);
+
+    // Hazard hit player -> lives reduced from 3 to 2, hazard removed
+    expect(controller.lives, equals(2));
+    expect(controller.objects, isEmpty);
+
+    controller.dispose();
+  });
 }
