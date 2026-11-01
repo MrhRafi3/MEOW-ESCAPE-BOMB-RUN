@@ -1,0 +1,48 @@
+name: bomb_run
+description: A Flutter arcade game where the player avoids falling objects. (Option B)
+publish_to: 'none'
+version: 1.0.0+1
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/icon.png"
+  min_sdk_android: 21
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.1.1
+  url_launcher: ^6.1.12
+
+  cupertino_icons: ^1.0.6
+
+
+  # Sound effects (for hit, score, etc.)
+  audioplayers: ^6.0.0
+
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+  shared_preferences: ^2.1.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/images/player.png
+    - assets/images/rock.png
+    - assets/images/shield.png
+    - assets/images/slow.png
+    - assets/images/my_logo.gif
+
+    # Sound effects
+    - assets/sounds/
+    - assets/sfx/hit.wav
+    - assets/sfx/point.wav
