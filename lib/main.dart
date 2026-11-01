@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/game_page.dart';
 import 'pages/settings_page.dart';
+import 'services/game_preferences.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GamePreferences.init();
   runApp(const AvoidGame());
 }
 
