@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
@@ -30,17 +29,21 @@ class _GamePageState extends State<GamePage> {
   int highScore = 0;
   double baseSpeed = Constants.objectFallSpeed;
 
-  // TIMERS
+  // TIMERS & POWER-UPS
   Timer? gameLoop;
   Timer? spawner;
   bool shieldActive = false;
   bool slowActive = false;
   Timer? shieldTimer;
   Timer? slowTimer;
+  DateTime? shieldEndTime;
+  DateTime? slowEndTime;
+  Duration shieldRemaining = Duration.zero;
+  Duration slowRemaining = Duration.zero;
 
   // Pause & countdown
   bool isPaused = false;
-  int countdown = 3;
+  int countdown = 0;
   Timer? countdownTimer;
 
   // SOUND
@@ -76,13 +79,16 @@ class _GamePageState extends State<GamePage> {
 
   Future<void> loadSoundSetting() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       isSoundOn = prefs.getBool('isSoundOn') ?? true;
+      GameSounds.setSoundEnabled(isSoundOn);
     });
   }
 
   Future<void> loadHighScore() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       highScore = prefs.getInt('highScore') ?? 0;
     });
@@ -97,11 +103,13 @@ class _GamePageState extends State<GamePage> {
 
   // START GAME
   void startGame() {
-    gameLoop =
-        Timer.periodic(const Duration(milliseconds: 16), (timer) {
-          updateObjects();
-          checkCollision();
-        });
+    gameLoop?.cancel();
+    spawner?.cancel();
+
+    gameLoop = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      updateObjects();
+      checkCollision();
+    });
 
     spawner = Timer.periodic(
         Duration(milliseconds: Constants.spawnInterval.toInt()), (_) {
@@ -110,20 +118,22 @@ class _GamePageState extends State<GamePage> {
   }
 
   void spawnObject() {
+    if (!mounted || isPaused || countdown > 0) return;
     final width = MediaQuery.of(context).size.width;
     objects.add(FallingObject.random(width, baseSpeed));
   }
 
   void updateObjects() {
-    if (isPaused) return;
+    if (!mounted || isPaused || countdown > 0) return;
 
     setState(() {
       for (var obj in objects) {
         obj.y += obj.speed;
       }
 
+      final screenHeight = MediaQuery.of(context).size.height;
       objects.removeWhere((obj) {
-        if (obj.y > MediaQuery.of(context).size.height) {
+        if (obj.y > screenHeight) {
           score++;
           if (isSoundOn) GameSounds.score();
           baseSpeed += GameConfig.difficultyIncreaseRate;
@@ -141,7 +151,10 @@ class _GamePageState extends State<GamePage> {
       shieldActive = true;
     });
     shieldTimer?.cancel();
-    shieldTimer = Timer(const Duration(seconds: 5), () {
+    shieldRemaining = const Duration(seconds: 5);
+    shieldEndTime = DateTime.now().add(shieldRemaining);
+    shieldTimer = Timer(shieldRemaining, () {
+      if (!mounted) return;
       setState(() {
         shieldActive = false;
       });
@@ -151,26 +164,43 @@ class _GamePageState extends State<GamePage> {
   void activateSlowMotion() {
     if (isSoundOn) GameSounds.slow();
     setState(() {
-      slowActive = true;
-      baseSpeed /= 2;
+      if (!slowActive) {
+        slowActive = true;
+        baseSpeed /= 2;
+        for (var obj in objects) {
+          obj.speed /= 2;
+        }
+      }
     });
+
     slowTimer?.cancel();
-    slowTimer = Timer(const Duration(seconds: 5), () {
+    slowRemaining = const Duration(seconds: 5);
+    slowEndTime = DateTime.now().add(slowRemaining);
+    slowTimer = Timer(slowRemaining, () {
+      if (!mounted) return;
       setState(() {
-        slowActive = false;
-        baseSpeed *= 2;
+        if (slowActive) {
+          slowActive = false;
+          baseSpeed *= 2;
+          for (var obj in objects) {
+            obj.speed *= 2;
+          }
+        }
       });
     });
   }
 
   // COLLISION
   void checkCollision() {
+    if (!mounted || isPaused || countdown > 0) return;
+
+    final playerTop =
+        MediaQuery.of(context).size.height - Constants.playerSize - 20;
+
     for (var obj in objects) {
       if (isColliding(
         player.x,
-        MediaQuery.of(context).size.height -
-            Constants.playerSize -
-            20,
+        playerTop,
         Constants.playerSize,
         obj.x,
         obj.y,
@@ -182,7 +212,7 @@ class _GamePageState extends State<GamePage> {
           activateSlowMotion();
         } else {
           if (!shieldActive) {
-            playNextHitSound(); // FIXED HIT SEQUENCE
+            playNextHitSound();
 
             setState(() {
               lives--;
@@ -191,13 +221,19 @@ class _GamePageState extends State<GamePage> {
             if (lives <= 0) {
               gameLoop?.cancel();
               spawner?.cancel();
+              shieldTimer?.cancel();
+              slowTimer?.cancel();
+              countdownTimer?.cancel();
               saveHighScore();
 
+              if (!mounted) return;
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          GameOverPage(score: score)));
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GameOverPage(score: score),
+                ),
+              );
+              return;
             }
           }
         }
@@ -208,14 +244,17 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
-  // MOVEMENT
+  // MOVEMENT WITH BOUNDARY CLAMPING
   void movePlayer(bool left) {
+    if (!mounted) return;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxRight = (screenWidth - Constants.playerSize).clamp(0.0, double.infinity);
+
     setState(() {
       if (left) {
-        player.x = moveLeft(player.x, Constants.playerSpeed);
+        player.x = (moveLeft(player.x, Constants.playerSpeed)).clamp(0.0, maxRight);
       } else {
-        player.x =
-            moveRight(player.x, Constants.playerSpeed);
+        player.x = (moveRight(player.x, Constants.playerSpeed)).clamp(0.0, maxRight);
       }
     });
   }
@@ -228,13 +267,54 @@ class _GamePageState extends State<GamePage> {
     });
     gameLoop?.cancel();
     spawner?.cancel();
+
+    // Preserve remaining power-up durations
+    if (shieldActive && shieldEndTime != null) {
+      shieldRemaining = shieldEndTime!.difference(DateTime.now());
+      shieldTimer?.cancel();
+      if (shieldRemaining.isNegative) shieldRemaining = Duration.zero;
+    }
+    if (slowActive && slowEndTime != null) {
+      slowRemaining = slowEndTime!.difference(DateTime.now());
+      slowTimer?.cancel();
+      if (slowRemaining.isNegative) slowRemaining = Duration.zero;
+    }
+
     showPauseMenu();
   }
 
   void resumeGame() {
     setState(() {
       isPaused = false;
+      countdown = 0;
     });
+
+    // Resume remaining power-up durations
+    if (shieldActive && shieldRemaining > Duration.zero) {
+      shieldEndTime = DateTime.now().add(shieldRemaining);
+      shieldTimer = Timer(shieldRemaining, () {
+        if (!mounted) return;
+        setState(() {
+          shieldActive = false;
+        });
+      });
+    }
+    if (slowActive && slowRemaining > Duration.zero) {
+      slowEndTime = DateTime.now().add(slowRemaining);
+      slowTimer = Timer(slowRemaining, () {
+        if (!mounted) return;
+        setState(() {
+          if (slowActive) {
+            slowActive = false;
+            baseSpeed *= 2;
+            for (var obj in objects) {
+              obj.speed *= 2;
+            }
+          }
+        });
+      });
+    }
+
     startGame();
   }
 
@@ -244,17 +324,17 @@ class _GamePageState extends State<GamePage> {
     });
     countdownTimer?.cancel();
 
-    countdownTimer =
-        Timer.periodic(const Duration(seconds: 1), (timer) {
-          setState(() {
-            countdown--;
-          });
+    countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        countdown--;
+      });
 
-          if (countdown <= 0) {
-            timer.cancel();
-            resumeGame();
-          }
-        });
+      if (countdown <= 0) {
+        timer.cancel();
+        resumeGame();
+      }
+    });
   }
 
   void restartGame() {
@@ -272,7 +352,9 @@ class _GamePageState extends State<GamePage> {
       slowActive = false;
       baseSpeed = Constants.objectFallSpeed;
       isPaused = false;
-      hitCounter = 0; // reset sound cycle
+      countdown = 0;
+      hitCounter = 0;
+      player.x = 150;
     });
 
     startCountdown();
@@ -286,50 +368,47 @@ class _GamePageState extends State<GamePage> {
         backgroundColor: Colors.black87,
         title: const Text(
           "PAUSED",
-          style:
-          TextStyle(color: Colors.white, fontSize: 28),
+          style: TextStyle(color: Colors.white, fontSize: 28),
           textAlign: TextAlign.center,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ElevatedButton(
-              // *** FIX HERE ***
               onPressed: () {
-                Navigator.pop(context); // Only pop the dialog
-                startCountdown();       // Resume the game after countdown
+                Navigator.pop(context); // Pop the dialog
+                startCountdown();       // Resume after countdown
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.greenAccent,   // Button color
-                foregroundColor: Colors.black,  // Text color
+                backgroundColor: Colors.greenAccent,
+                foregroundColor: Colors.black,
               ),
               child: const Text("RESUME"),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
-              // *** FIX HERE ***
               onPressed: () {
-                Navigator.pop(context); // Only pop the dialog
-                restartGame();          // Restart the game
+                Navigator.pop(context);
+                restartGame();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orangeAccent,   // Button color
-                foregroundColor: Colors.black,  // Text color
+                backgroundColor: Colors.orangeAccent,
+                foregroundColor: Colors.black,
               ),
               child: const Text("RESTART"),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // Pop the dialog
-                Navigator.pop(context); // Pop the GamePage to go home
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,   // Button color
-                foregroundColor: Colors.white,  // Text color
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
               ),
               child: const Text("HOME"),
-            )
+            ),
           ],
         ),
       ),
@@ -351,8 +430,8 @@ class _GamePageState extends State<GamePage> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (d) {
-        var mid =
-            MediaQuery.of(context).size.width / 2;
+        if (isPaused || countdown > 0) return;
+        var mid = MediaQuery.of(context).size.width / 2;
         movePlayer(d.localPosition.dx < mid);
       },
       child: Scaffold(
@@ -371,32 +450,12 @@ class _GamePageState extends State<GamePage> {
               child: Row(
                 children: List.generate(
                     lives,
-                        (index) => const Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 4),
-                      child: Icon(Icons.favorite,
-                          color: Colors.red),
+                    (index) => const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.favorite, color: Colors.red),
                     )),
               ),
             ),
-
-            // Positioned(
-            //   top: 40,
-            //   left: 20,
-            //   child: Text(
-            //     "High: $highScore",
-            //     style: const TextStyle(
-            //       fontSize: 22,
-            //       color: Colors.yellow,
-            //       fontWeight: FontWeight.bold,
-            //       shadows: [
-            //         Shadow(
-            //             blurRadius: 3,
-            //             color: Colors.black)
-            //       ],
-            //     ),
-            //   ),
-            // ),
 
             if (shieldActive)
               const Positioned(
@@ -429,7 +488,7 @@ class _GamePageState extends State<GamePage> {
               ),
             ),
 
-            if (isPaused && countdown > 0)
+            if (countdown > 0)
               Center(
                 child: Text(
                   "$countdown",
@@ -438,9 +497,7 @@ class _GamePageState extends State<GamePage> {
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     shadows: [
-                      Shadow(
-                          blurRadius: 5,
-                          color: Colors.black)
+                      Shadow(blurRadius: 5, color: Colors.black)
                     ],
                   ),
                 ),

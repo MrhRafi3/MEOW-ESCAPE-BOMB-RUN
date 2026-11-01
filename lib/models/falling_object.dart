@@ -19,8 +19,11 @@ class FallingObject {
     // Randomly decide object type
     ObjectType type = ObjectType.normal;
     double chance = (Random().nextDouble());
-    if (chance < 0.05) type = ObjectType.shield;   // 5% chance shield
-    else if (chance < 0.10) type = ObjectType.slow; // 5% chance slow motion
+    if (chance < 0.05) {
+      type = ObjectType.shield; // 5% chance shield
+    } else if (chance < 0.10) {
+      type = ObjectType.slow; // 5% chance slow motion
+    }
 
     return FallingObject(
       x: Random().nextDouble() * (screenWidth - 40),

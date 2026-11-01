@@ -16,7 +16,7 @@ class ShootingStarWidget extends StatefulWidget {
 
 class _ShootingStarWidgetState extends State<ShootingStarWidget> {
   final List<ShootingStar> stars = [];
-  late Timer timer;
+  Timer? _timer;
   final Random random = Random();
 
   @override
@@ -25,6 +25,8 @@ class _ShootingStarWidgetState extends State<ShootingStarWidget> {
 
     // Initialize stars with random positions, length, and speed
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
       final screenWidth = MediaQuery.of(context).size.width;
       final screenHeight = MediaQuery.of(context).size.height;
 
@@ -38,7 +40,8 @@ class _ShootingStarWidgetState extends State<ShootingStarWidget> {
       }
 
       // Start animation loop
-      timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      _timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+        if (!mounted) return;
         setState(() {
           for (var star in stars) {
             star.update(screenWidth, screenHeight);
@@ -50,7 +53,7 @@ class _ShootingStarWidgetState extends State<ShootingStarWidget> {
 
   @override
   void dispose() {
-    timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 

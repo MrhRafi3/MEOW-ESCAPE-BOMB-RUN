@@ -4,17 +4,24 @@ class GameSounds {
   GameSounds._();
 
   static bool isSoundOn = true;
+  static AudioPlayer? _sfxPlayer;
+
+  static AudioPlayer get _player {
+    _sfxPlayer ??= AudioPlayer();
+    return _sfxPlayer!;
+  }
+
+  static void setSoundEnabled(bool enabled) {
+    isSoundOn = enabled;
+  }
 
   static Future<void> _play(String assetPath) async {
     if (!isSoundOn) return;
 
     try {
-      final player = AudioPlayer();
+      final player = _player;
+      await player.stop();
       await player.play(AssetSource(assetPath));
-
-      Future.delayed(const Duration(seconds: 3), () {
-        player.dispose();
-      });
     } catch (_) {}
   }
 
@@ -27,6 +34,11 @@ class GameSounds {
   static Future<void> shield() => _play('sounds/shield.mp3');
   static Future<void> slow() => _play('sounds/slow.mp3');
 
-  // Score sound
-  static Future<void> score() => _play('sounds/point.mp3');
+  // Score sound (verified asset location: assets/sfx/point.wav)
+  static Future<void> score() => _play('sfx/point.wav');
+
+  static void dispose() {
+    _sfxPlayer?.dispose();
+    _sfxPlayer = null;
+  }
 }

@@ -14,13 +14,13 @@ class GameOverPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               "GAME OVER",
               style: TextStyle(
                 color: Colors.red,
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
-                shadows: const [
+                shadows: [
                   Shadow(blurRadius: 4, color: Colors.black, offset: Offset(2, 2))
                 ],
               ),
