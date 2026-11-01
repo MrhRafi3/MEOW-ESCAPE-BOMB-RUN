@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../controllers/game_controller.dart';
+import '../core/app_theme.dart';
 import '../core/constants.dart';
 import '../widgets/object_widget.dart';
 import '../widgets/player_widget.dart';
@@ -85,52 +87,85 @@ class _GamePageState extends State<GamePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.black87,
-        title: const Text(
-          "PAUSED",
-          style: TextStyle(color: Colors.white, fontSize: 28),
-          textAlign: TextAlign.center,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _resumeAfterCountdown();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.greenAccent,
-                foregroundColor: Colors.black,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.cardDark.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppTheme.neonCyan.withValues(alpha: 0.5),
+                width: 2,
               ),
-              child: const Text("RESUME"),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.neonCyan.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _restartGame();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orangeAccent,
-                foregroundColor: Colors.black,
-              ),
-              child: const Text("RESTART"),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "GAME PAUSED",
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.0,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 10,
+                        color: AppTheme.neonCyan,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ArcadeButton(
+                  label: "RESUME",
+                  icon: Icons.play_arrow_rounded,
+                  primaryColor: AppTheme.neonGreen,
+                  textColor: Colors.black,
+                  width: double.infinity,
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _resumeAfterCountdown();
+                  },
+                ),
+                const SizedBox(height: 12),
+                ArcadeButton(
+                  label: "RESTART",
+                  icon: Icons.replay_rounded,
+                  primaryColor: AppTheme.neonOrange,
+                  textColor: Colors.black,
+                  width: double.infinity,
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _restartGame();
+                  },
+                ),
+                const SizedBox(height: 12),
+                ArcadeButton(
+                  label: "HOME",
+                  icon: Icons.home_rounded,
+                  primaryColor: AppTheme.surfaceDark,
+                  textColor: Colors.white,
+                  width: double.infinity,
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("HOME"),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -159,76 +194,196 @@ class _GamePageState extends State<GamePage> {
             );
           },
           child: Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: AppTheme.bgDark,
             body: Stack(
               children: [
+                // Falling Hazards and Power-Ups
                 ..._controller.objects.map(
                   (o) => ObjectWidget(x: o.x, y: o.y, type: o.type),
                 ),
 
+                // Player Cat
                 PlayerWidget(x: _controller.player.x),
-                ScoreText(score: _controller.score),
 
-                Positioned(
-                  top: 40,
-                  right: 20,
-                  child: Row(
-                    children: List.generate(
-                      _controller.lives,
-                      (index) => const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(Icons.favorite, color: Colors.red),
-                      ),
+                // Top HUD Bar with Safe Area Protection
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            // Score Badge
+                            ScoreText(score: _controller.score),
+
+                            const Spacer(),
+
+                            // Fixed 3-Heart Container (Full vs Outline)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceDark
+                                    .withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppTheme.cardBorder,
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(3, (index) {
+                                  final isFull = index < _controller.lives;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 2),
+                                    child: Icon(
+                                      isFull
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: isFull
+                                          ? AppTheme.neonRed
+                                          : Colors.white24,
+                                      size: 20,
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+
+                            const SizedBox(width: 10),
+
+                            // Pause Button
+                            InkWell(
+                              onTap: _pauseGame,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceDark
+                                      .withValues(alpha: 0.85),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppTheme.cardBorder,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.pause_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        // Active Buff Status Indicators
+                        Row(
+                          children: [
+                            if (_controller.shieldActive)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.neonCyan
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.neonCyan,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.shield_rounded,
+                                        color: AppTheme.neonCyan, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "SHIELD ACTIVE",
+                                      style: TextStyle(
+                                        color: AppTheme.neonCyan,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (_controller.slowActive)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.neonGreen
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.neonGreen,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.slow_motion_video_rounded,
+                                        color: AppTheme.neonGreen, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "SLOW-MO",
+                                      style: TextStyle(
+                                        color: AppTheme.neonGreen,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
 
-                if (_controller.shieldActive)
-                  const Positioned(
-                    top: 80,
-                    left: 20,
-                    child: Icon(
-                      Icons.shield,
-                      color: Colors.blueAccent,
-                      size: 32,
-                    ),
-                  ),
-
-                if (_controller.slowActive)
-                  const Positioned(
-                    top: 80,
-                    left: 60,
-                    child: Icon(
-                      Icons.slow_motion_video,
-                      color: Colors.greenAccent,
-                      size: 32,
-                    ),
-                  ),
-
-                Positioned(
-                  top: 70,
-                  right: 20,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.pause_circle_filled,
-                      color: Colors.white,
-                      size: 36,
-                    ),
-                    onPressed: _pauseGame,
-                  ),
-                ),
-
+                // Resume Countdown Overlay
                 if (_controller.countdown > 0)
                   Center(
-                    child: Text(
-                      "${_controller.countdown}",
-                      style: const TextStyle(
-                        fontSize: 80,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(blurRadius: 5, color: Colors.black),
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppTheme.neonCyan,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.neonCyan.withValues(alpha: 0.4),
+                            blurRadius: 24,
+                            spreadRadius: 4,
+                          ),
                         ],
+                      ),
+                      child: Text(
+                        "${_controller.countdown}",
+                        style: const TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
